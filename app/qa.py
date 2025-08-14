@@ -1,38 +1,27 @@
 # app/qa.py
-import os, hashlib
+import os
+import hashlib
 from typing import List, Dict, Any, Tuple
+
 from dotenv import load_dotenv
 from chromadb import PersistentClient
-from chromadb.config import Settings  # << ekle
+from chromadb.config import Settings
 
 load_dotenv()
 
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./data/chroma")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "hsd_ei")
 
-# CI algılama ve varsayılan fake kullanım
+# CI'da otomatik fake embedding
 CI = os.getenv("GITHUB_ACTIONS", "false") == "true"
 USE_FAKE = os.getenv("USE_FAKE_EMBEDDINGS", "1" if CI else "0") == "1"
-
-
-def get_collection():
-    disable = os.getenv("CHROMA_DISABLE_TELEMETRY", "1") == "1"
-    settings = Settings(anonymized_telemetry=not disable)
-    client = PersistentClient(path=CHROMA_PATH, settings=settings)
-    return client.get_or_create_collection(COLLECTION_NAME)
-load_dotenv()
-
-CHROMA_PATH = os.getenv("CHROMA_PATH", "./data/chroma")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "hsd_ei")
-USE_FAKE = os.getenv("USE_FAKE_EMBEDDINGS", "0") == "1"
 
 # ---------- Embeddings ----------
 def _fake_embed(texts: List[str]) -> List[List[float]]:
     vecs = []
     for t in texts:
         h = hashlib.sha256(t.encode("utf-8")).digest()
-        v = [((h[i % len(h)]/255.0)-0.5) for i in range(64)]
-        vecs.append(v)
+        vecs.append([((h[i % len(h)] / 255.0) - 0.5) for i in range(64)])
     return vecs
 
 def _openai_embed(texts: List[str]) -> List[List[float]]:
@@ -47,9 +36,10 @@ def embed(texts: List[str]) -> List[List[float]]:
 
 # ---------- Chroma ----------
 def get_collection():
-    client = PersistentClient(path=CHROMA_PATH)
-    col = client.get_or_create_collection(COLLECTION_NAME)
-    return col
+    disable = os.getenv("CHROMA_DISABLE_TELEMETRY", "1") == "1"
+    settings = Settings(anonymized_telemetry=not disable)
+    client = PersistentClient(path=CHROMA_PATH, settings=settings)
+    return client.get_or_create_collection(COLLECTION_NAME)
 
 def add_documents(docs: List[str], metas: List[Dict[str, Any]], ids: List[str]):
     col = get_collection()
@@ -60,20 +50,23 @@ def query(query_text: str, k: int = 6, course: str | None = None):
     col = get_collection()
     qemb = embed([query_text])[0]
     where = {"course": course} if course else None
+
+    # 'ids' include EDİLMEZ (Chroma 0.5 kabul etmiyor); zaten res["ids"] içinde döner.
     res = col.query(
         query_embeddings=[qemb],
         n_results=k,
         where=where,
-        include=["documents", "metadatas", "distances", "ids"],
+        include=["documents", "metadatas", "distances"],
     )
-    hits = []
-    if res and res["ids"]:
+
+    hits: List[Dict[str, Any]] = []
+    if res and res.get("ids"):
         for i in range(len(res["ids"][0])):
             hits.append({
                 "id": res["ids"][0][i],
-                "document": res["documents"][0][i],
-                "meta": res["metadatas"][0][i],
-                "distance": res["distances"][0][i],
+                "document": res["documents"][0][i] if res.get("documents") else "",
+                "meta": res["metadatas"][0][i] if res.get("metadatas") else {},
+                "distance": res["distances"][0][i] if res.get("distances") else None,
             })
     return hits
 
@@ -103,24 +96,20 @@ def answer(query_text: str, course: str | None = None, k: int = 6) -> Tuple[str,
     prompt = build_prompt_de(query_text, hits)
 
     if USE_FAKE:
-        # Offline demo: en az 2 alıntı taklidi
         citations = ""
         if hits:
             cit = []
             for h in hits[:2]:
-                src = h["meta"].get("source")
-                p1, p2 = h["meta"].get("page_start"), h["meta"].get("page_end")
-                cit.append(f"[Quelle: {src}, S. {p1}-{p2}]")
+                src = h["meta"].get("source", "Unknown")
+                p1 = h["meta"].get("page_start")
+                p2 = h["meta"].get("page_end")
+                pages = f"{p1}-{p2}" if (p1 and p2 and p1 != p2) else f"{p1}"
+                cit.append(f"[Quelle: {src}, S. {pages}]")
             citations = "\n\n" + " ".join(cit)
         return f"(Demo-Antwort) {query_text}{citations}", hits
 
     from openai import OpenAI
     client = OpenAI()
     model = os.getenv("CHAT_MODEL", "gpt-5-mini")
-
-    resp = client.responses.create(
-        model=model,
-        input=[{"role": "user", "content": prompt}],
-    )
-    text = resp.output_text
-    return text, hits
+    resp = client.responses.create(model=model, input=[{"role": "user", "content": prompt}])
+    return resp.output_text, hits

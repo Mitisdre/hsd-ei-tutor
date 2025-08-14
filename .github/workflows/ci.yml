@@ -4,10 +4,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      USE_FAKE_EMBEDDINGS: "1"         # CI'da asla gerçek OpenAI çağrısı yapma
-      CHROMA_DISABLE_TELEMETRY: "1"    # Chroma telemetry uyarılarını sustur
-      CHROMA_PATH: "./data/chroma"     # test için local path
-      COLLECTION_NAME: "hsd_ei_test"   # izole test koleksiyonu
+      USE_FAKE_EMBEDDINGS: "1"       # OpenAI çağrısı yok
+      CHROMA_DISABLE_TELEMETRY: "1"  # Chroma telemetri sessiz
+      CHROMA_PATH: "./data/chroma"
+      COLLECTION_NAME: "hsd_ei_test"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
