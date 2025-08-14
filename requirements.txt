@@ -1,0 +1,11 @@
+streamlit==1.36.0
+chromadb==0.5.4
+pypdf==4.2.0
+tiktoken==0.7.0
+openai==1.40.0
+python-dotenv==1.0.1
+pytest==8.2.0
+black==24.4.2
+rapidfuzz==3.9.5
+
+httpx>=0.27,<0.28
