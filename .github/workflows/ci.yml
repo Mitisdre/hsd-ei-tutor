@@ -3,11 +3,18 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      USE_FAKE_EMBEDDINGS: "1"         # CI'da asla gerçek OpenAI çağrısı yapma
+      CHROMA_DISABLE_TELEMETRY: "1"    # Chroma telemetry uyarılarını sustur
+      CHROMA_PATH: "./data/chroma"     # test için local path
+      COLLECTION_NAME: "hsd_ei_test"   # izole test koleksiyonu
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: pytest -q
-      - run: black --check .
+      - name: Run tests (offline)
+        run: pytest -q
+      - name: Black check
+        run: black --check .
