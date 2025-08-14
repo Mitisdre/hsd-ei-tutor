@@ -3,7 +3,17 @@ import os, hashlib
 from typing import List, Dict, Any, Tuple
 from dotenv import load_dotenv
 from chromadb import PersistentClient
-from chromadb.config import Settings
+from chromadb.config import Settings  # << ekle
+
+load_dotenv()
+
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./data/chroma")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "hsd_ei")
+
+# CI algılama ve varsayılan fake kullanım
+CI = os.getenv("GITHUB_ACTIONS", "false") == "true"
+USE_FAKE = os.getenv("USE_FAKE_EMBEDDINGS", "1" if CI else "0") == "1"
+
 
 def get_collection():
     disable = os.getenv("CHROMA_DISABLE_TELEMETRY", "1") == "1"
