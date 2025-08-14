@@ -3,6 +3,7 @@ import sys, pathlib
 from pypdf import PdfReader
 import tiktoken
 
+
 def is_probably_pdf(path: pathlib.Path) -> bool:
     try:
         with open(path, "rb") as f:
@@ -12,6 +13,7 @@ def is_probably_pdf(path: pathlib.Path) -> bool:
     except Exception:
         return False
 
+
 def pdf_tokens(path: str) -> int:
     text = ""
     for p in PdfReader(path).pages:
@@ -19,6 +21,7 @@ def pdf_tokens(path: str) -> int:
         text += t + "\n"
     enc = tiktoken.get_encoding("cl100k_base")
     return len(enc.encode(text))
+
 
 if __name__ == "__main__":
     base = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "docs")
@@ -37,7 +40,9 @@ if __name__ == "__main__":
             continue
 
     print(f"TOTAL ~{total} tokens")
-    print(f"EST_EMBED_COST (text-embedding-3-small @ $0.02/M) ≈ ${total/1_000_000*0.02:.2f}")
+    print(
+        f"EST_EMBED_COST (text-embedding-3-small @ $0.02/M) ≈ ${total/1_000_000*0.02:.2f}"
+    )
     if skipped:
         print("\nSkipped files:")
         for name, reason in skipped:

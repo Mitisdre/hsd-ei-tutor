@@ -1,5 +1,6 @@
 from app.qa import answer
 
+
 def test_answer_returns_text_and_hits_list():
     text, hits = answer("Testfrage?")
     assert isinstance(text, str)
