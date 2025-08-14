@@ -25,6 +25,29 @@ with st.sidebar:
         "Für Produktionsbetrieb bitte `.env` → `HYBRID_ALPHA` anpassen."
     )
 
+
+def render_sources(hits):
+    with st.expander("📎 Verwendete Kontexte / Quellen"):
+        for i, h in enumerate(hits, 1):
+            meta = h["meta"]
+            src = meta.get("source", "Unknown")
+            p_from, p_to = meta.get("page_start"), meta.get("page_end")
+            pages = f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
+            st.markdown(f"**[{i}] {src}, {pages}**")
+            st.caption(
+                h["document"][:500] + ("..." if len(h["document"]) > 500 else "")
+            )
+
+
+def confidence_from_hits(hits):
+    # qa.py hybrid rerank 'score' alanı set ediyor (0..1)
+    if not hits:
+        return 0
+    scores = [h.get("score", 0.0) for h in hits[:3]]
+    avg = sum(scores) / max(len(scores), 1)
+    return int(round(avg * 100))
+
+
 tab1, tab2 = st.tabs(["❓ Q&A", "📝 Quiz"])
 
 with tab1:
@@ -37,18 +60,10 @@ with tab1:
             text, hits = answer(q, course=sel_course, k=topk)
         st.markdown("### Antwort")
         st.write(text)
+        conf = confidence_from_hits(hits)
+        st.metric("🔎 Vertrauensindex (0–100)", conf)
         if hits:
-            with st.expander("📎 Verwendete Kontexte / Quellen"):
-                for i, h in enumerate(hits, 1):
-                    meta = h["meta"]
-                    src = meta.get("source", "Unknown")
-                    p_from, p_to = meta.get("page_start"), meta.get("page_end")
-                    pages = f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
-                    st.markdown(f"**[{i}] {src}, {pages}**")
-                    st.caption(
-                        h["document"][:500]
-                        + ("..." if len(h["document"]) > 500 else "")
-                    )
+            render_sources(hits)
 
 with tab2:
     col_a, col_b = st.columns([2, 1])
@@ -70,15 +85,7 @@ with tab2:
             )
         st.markdown("### Quiz")
         st.markdown(quiz_md)
+        conf = confidence_from_hits(hits)
+        st.metric("🔎 Vertrauensindex (0–100)", conf)
         if hits:
-            with st.expander("📎 Verwendete Kontexte / Quellen"):
-                for i, h in enumerate(hits, 1):
-                    meta = h["meta"]
-                    src = meta.get("source", "Unknown")
-                    p_from, p_to = meta.get("page_start"), meta.get("page_end")
-                    pages = f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
-                    st.markdown(f"**[{i}] {src}, {pages}**")
-                    st.caption(
-                        h["document"][:500]
-                        + ("..." if len(h["document"]) > 500 else "")
-                    )
+            render_sources(hits)

@@ -7,11 +7,19 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 # -------------------------------------------------------------------
 
-import os, sys, pathlib, re
+import pathlib, re
 from typing import List, Dict, Tuple
+
 from pypdf import PdfReader
 import tiktoken
+
 from app.qa import add_documents
+
+# OCR & render
+OCR_ENABLE = os.getenv("OCR_ENABLE", "1") == "1"
+OCR_LANGS = os.getenv("OCR_LANGS", "deu+eng")
+OCR_MIN_CHARS = int(os.getenv("OCR_MIN_CHARS", "30"))
+OCR_RENDER_SCALE = float(os.getenv("OCR_RENDER_SCALE", "2.0"))
 
 
 def is_probably_pdf(path: pathlib.Path) -> bool:
@@ -42,12 +50,44 @@ def chunk_by_tokens(text: str, target: int = 1000, overlap: int = 150) -> List[s
     return chunks
 
 
+def ocr_page(path: pathlib.Path, page_index: int) -> str:
+    """Tek sayfayı img'e render edip Tesseract ile OCR yap."""
+    if not OCR_ENABLE:
+        return ""
+    try:
+        import pypdfium2 as pdfium
+        import pytesseract
+
+        # Sayfayı render et
+        pdf = pdfium.PdfDocument(str(path))
+        if page_index < 0 or page_index >= len(pdf):
+            return ""
+        page = pdf[page_index]
+        pil = page.render(scale=OCR_RENDER_SCALE).to_pil()
+        txt = pytesseract.image_to_string(pil, lang=OCR_LANGS)
+        return clean_text(txt or "")
+    except Exception as e:
+        print(f"OCR skipped ({path.name} p{page_index+1}): {type(e).__name__}: {e}")
+        return ""
+
+
 def extract_pdf_chunks(pdf_path: pathlib.Path) -> List[Tuple[str, Dict]]:
     reader = PdfReader(str(pdf_path))
     pages = []
+    # pypdf ile ilk deneme
     for pi, p in enumerate(reader.pages, 1):
-        pages.append((pi, clean_text(p.extract_text() or "")))
-    docs, buf, start_page = [], "", 1
+        txt = clean_text(p.extract_text() or "")
+        # Gerekirse OCR fallback
+        if len(txt) < OCR_MIN_CHARS:
+            ocr_txt = ocr_page(pdf_path, pi - 1)
+            if len(ocr_txt) > len(txt):
+                txt = ocr_txt
+        pages.append((pi, txt))
+
+    # sayfa-birleştirmeli chunking
+    docs = []
+    buf = ""
+    start_page = 1
     for pi, txt in pages:
         if not txt.strip():
             continue
@@ -73,6 +113,7 @@ if __name__ == "__main__":
 
     docs, metas, ids = [], [], []
     skipped = []
+
     for pdf in items:
         if not is_probably_pdf(pdf):
             skipped.append((str(pdf), "invalid header"))
