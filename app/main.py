@@ -28,12 +28,18 @@ with st.sidebar:
 
 def render_sources(hits):
     with st.expander("📎 Verwendete Kontexte / Quellen"):
+        def _format_pages(p_from, p_to):
+            if p_from is None or p_to is None:
+                return ""
+            return f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
+
         for i, h in enumerate(hits, 1):
             meta = h["meta"]
             src = meta.get("source", "Unknown")
             p_from, p_to = meta.get("page_start"), meta.get("page_end")
-            pages = f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
-            st.markdown(f"**[{i}] {src}, {pages}**")
+            pages = _format_pages(p_from, p_to)
+            page_text = f", {pages}" if pages else ""
+            st.markdown(f"**[{i}] {src}{page_text}**")
             st.caption(
                 h["document"][:500] + ("..." if len(h["document"]) > 500 else "")
             )

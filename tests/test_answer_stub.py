@@ -1,3 +1,6 @@
+import os
+
+os.environ["USE_FAKE_EMBEDDINGS"] = "1"
 from app.qa import answer
 
 

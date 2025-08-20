@@ -21,6 +21,12 @@ USE_FAKE = os.getenv("USE_FAKE_EMBEDDINGS", "1" if CI else "0") == "1"
 HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
 
+def _format_pages(p_from, p_to) -> str:
+    if p_from is None or p_to is None:
+        return ""
+    return f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
+
+
 # ---------- Embeddings ----------
 def _fake_embed(texts: List[str]) -> List[List[float]]:
     """Deterministik, 64-dim sahte embedding (CI/test için)"""
@@ -131,8 +137,9 @@ def build_prompt_de(query_text: str, contexts: List[Dict[str, Any]]) -> str:
         src = c["meta"].get("source", "Unknown")
         p_from = c["meta"].get("page_start")
         p_to = c["meta"].get("page_end")
-        pages = f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
-        lines.append(f"[{i}] Quelle: {src}, {pages}\n{c['document']}\n")
+        pages = _format_pages(p_from, p_to)
+        page_text = f", {pages}" if pages else ""
+        lines.append(f"[{i}] Quelle: {src}{page_text}\n{c['document']}\n")
     context_block = "\n---\n".join(lines) if lines else "(kein Kontext gefunden)"
 
     return (
@@ -161,8 +168,9 @@ def answer(
                 src = h["meta"].get("source", "Unknown")
                 p1 = h["meta"].get("page_start")
                 p2 = h["meta"].get("page_end")
-                pages = f"{p1}-{p2}" if (p1 and p2 and p1 != p2) else f"{p1}"
-                cit.append(f"[Quelle: {src}, S. {pages}]")
+                pages = _format_pages(p1, p2)
+                page_text = f", {pages}" if pages else ""
+                cit.append(f"[Quelle: {src}{page_text}]")
             citations = "\n\n" + " ".join(cit)
         return f"(Demo-Antwort) {query_text}{citations}", hits
 
@@ -186,8 +194,9 @@ def build_quiz_prompt_de(topic: str, contexts: List[Dict[str, Any]], n: int) -> 
         src = c["meta"].get("source", "Unknown")
         p_from = c["meta"].get("page_start")
         p_to = c["meta"].get("page_end")
-        pages = f"S. {p_from}" if p_from == p_to else f"S. {p_from}-{p_to}"
-        lines.append(f"[{i}] Quelle: {src}, {pages}\n{c['document']}\n")
+        pages = _format_pages(p_from, p_to)
+        page_text = f", {pages}" if pages else ""
+        lines.append(f"[{i}] Quelle: {src}{page_text}\n{c['document']}\n")
     context_block = "\n---\n".join(lines) if lines else "(kein Kontext gefunden)"
 
     return (
@@ -221,8 +230,9 @@ def generate_quiz(
                 src = h["meta"].get("source", "Unknown")
                 p1 = h["meta"].get("page_start")
                 p2 = h["meta"].get("page_end")
-                pages = f"{p1}-{p2}" if (p1 and p2 and p1 != p2) else f"{p1}"
-                cit.append(f"[Quelle: {src}, S. {pages}]")
+                pages = _format_pages(p1, p2)
+                page_text = f", {pages}" if pages else ""
+                cit.append(f"[Quelle: {src}{page_text}]")
             cits = "\n\n" + " ".join(cit)
         return body + cits, hits
 
