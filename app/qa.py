@@ -13,9 +13,14 @@ load_dotenv()
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./data/chroma")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "hsd_ei")
 
-# CI'da otomatik fake embeddings kullan
+# CI'da otomatik fake embeddings kullan ve API anahtarı yoksa otomatik fake'e düş
 CI = os.getenv("GITHUB_ACTIONS", "false") == "true"
-USE_FAKE = os.getenv("USE_FAKE_EMBEDDINGS", "1" if CI else "0") == "1"
+_env_use_fake = os.getenv("USE_FAKE_EMBEDDINGS")
+if _env_use_fake is not None:
+    USE_FAKE = _env_use_fake == "1"
+else:
+    # Varsayılan: CI'da veya OPENAI_API_KEY ayarlı değilse sahte embeddings
+    USE_FAKE = CI or not os.getenv("OPENAI_API_KEY")
 
 # Hybrid rerank parametresi (0..1): 1=embedding ağırlıklı, 0=keyword ağırlıklı
 HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
